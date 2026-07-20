@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
   }
   // Enrich with persisted profile data (e.g. createdAt).
-  const stored = userStore.findById(current.id);
+  const stored = await userStore.findById(current.id).catch(() => null);
   return NextResponse.json({
     user: {
       id: current.id,

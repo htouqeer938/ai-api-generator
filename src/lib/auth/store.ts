@@ -1,14 +1,12 @@
-import fs from "node:fs";
-import path from "node:path";
-import { nanoid } from "@/lib/utils";
+import { connectDB } from "@/lib/db/mongoose";
+import { User } from "@/lib/db/models/user";
 
 /* ─────────────────────────────────────────────────────────────
- * Minimal file-backed user store.
+ * MongoDB-backed user store (via Mongoose).
  *
- * For a zero-config demo we persist users to `.data/users.json`.
- * The abstraction (create/find) is deliberately DB-agnostic so it
- * can be swapped for Prisma/Mongoose without touching callers.
- * A demo account is seeded on first use.
+ * The interface stays DB-agnostic so callers only deal with a
+ * plain StoredUser. All persistence lives in MongoDB — nothing is
+ * written to disk.
  * ───────────────────────────────────────────────────────────── */
 
 export interface StoredUser {
@@ -19,56 +17,41 @@ export interface StoredUser {
   createdAt: string;
 }
 
-const DATA_DIR = path.join(process.cwd(), ".data");
-const FILE = path.join(DATA_DIR, "users.json");
-
-function ensureFile(): void {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(FILE)) {
-    // Seeded demo account — password "demo1234" (bcrypt hash).
-    const demo: StoredUser = {
-      id: nanoid(),
-      name: "Demo User",
-      email: "demo@aigen.dev",
-      // bcryptjs hash of "demo1234"
-      passwordHash:
-        "$2a$10$e8yp77X3SDSmGiX50oDDCuo2HRvhD8qbEwXnDAulQYBk7VmUUUd8e",
-      createdAt: new Date().toISOString(),
-    };
-    fs.writeFileSync(FILE, JSON.stringify([demo], null, 2));
-  }
-}
-
-function readAll(): StoredUser[] {
-  ensureFile();
-  try {
-    return JSON.parse(fs.readFileSync(FILE, "utf8")) as StoredUser[];
-  } catch {
-    return [];
-  }
-}
-
-function writeAll(users: StoredUser[]): void {
-  ensureFile();
-  fs.writeFileSync(FILE, JSON.stringify(users, null, 2));
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toStored(doc: any): StoredUser {
+  return {
+    id: String(doc._id),
+    name: doc.name,
+    email: doc.email,
+    passwordHash: doc.passwordHash,
+    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : "",
+  };
 }
 
 export const userStore = {
-  findByEmail(email: string): StoredUser | undefined {
-    return readAll().find((u) => u.email.toLowerCase() === email.toLowerCase());
+  async findByEmail(email: string): Promise<StoredUser | null> {
+    await connectDB();
+    const doc = await User.findOne({ email: email.toLowerCase().trim() }).lean();
+    return doc ? toStored(doc) : null;
   },
-  findById(id: string): StoredUser | undefined {
-    return readAll().find((u) => u.id === id);
+
+  async findById(id: string): Promise<StoredUser | null> {
+    await connectDB();
+    try {
+      const doc = await User.findById(id).lean();
+      return doc ? toStored(doc) : null;
+    } catch {
+      return null; // invalid ObjectId
+    }
   },
-  create(user: Omit<StoredUser, "id" | "createdAt">): StoredUser {
-    const users = readAll();
-    const created: StoredUser = {
-      ...user,
-      id: nanoid(),
-      createdAt: new Date().toISOString(),
-    };
-    users.push(created);
-    writeAll(users);
-    return created;
+
+  async create(user: Omit<StoredUser, "id" | "createdAt">): Promise<StoredUser> {
+    await connectDB();
+    const doc = await User.create({
+      name: user.name,
+      email: user.email.toLowerCase().trim(),
+      passwordHash: user.passwordHash,
+    });
+    return toStored(doc);
   },
 };

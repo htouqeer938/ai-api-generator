@@ -32,13 +32,14 @@ A full-stack **Next.js 15** SaaS application built with TypeScript, Tailwind CSS
 | Forms     | React Hook Form + Zod |
 | Data      | TanStack Query, Axios |
 | Editor    | Monaco (`@monaco-editor/react`) |
+| Database  | MongoDB + Mongoose (users, sessions, generation history) |
 | Auth      | `jose` (JWT), `bcryptjs`, httpOnly cookies |
 | AI        | OpenAI Responses API (with deterministic mock fallback) |
 | Export    | JSZip + FileSaver |
 
 ## 🚀 Getting started
 
-**Requirements:** Node.js 18.18+ (Node 20/22/24 recommended).
+**Requirements:** Node.js 18.18+ (Node 20/22/24 recommended) and a **MongoDB** instance (local `mongod` or a free MongoDB Atlas cluster).
 
 ```bash
 # 1. Install dependencies
@@ -46,12 +47,18 @@ npm install
 
 # 2. Configure environment
 cp .env.example .env.local
-# (optional) add OPENAI_API_KEY for live AI generation — otherwise mock mode is used.
+# set MONGODB_URI (e.g. mongodb://localhost:27017/ai-api-generator)
 # set a strong JWT_SECRET (openssl rand -base64 48)
+# (optional) add OPENAI_API_KEY for live AI generation — otherwise mock mode is used.
 
-# 3. Run the dev server
+# 3. (if running locally) start MongoDB
+mongod --dbpath /path/to/data
+
+# 4. Run the dev server
 npm run dev
 ```
+
+The demo account is **seeded automatically** in MongoDB on first connection.
 
 Open [http://localhost:3000](http://localhost:3000).
 
@@ -70,6 +77,7 @@ Or click **“Use demo account”** on the login page. You can also sign up for 
 
 | Variable | Required | Description |
 |----------|----------|-------------|
+| `MONGODB_URI` | Yes | MongoDB connection string. Stores users, sessions and generation history. |
 | `OPENAI_API_KEY` | No | Enables live generation via the OpenAI Responses API. Empty → **mock mode**. |
 | `OPENAI_MODEL` | No | Model id (default `gpt-4o-mini`). |
 | `JWT_SECRET` | Yes* | Secret used to sign JWTs. *(A dev fallback is used if unset — set your own for production.)* |
@@ -98,7 +106,8 @@ src/
     generator/            editor, file-tree, options, result view, swagger, markdown
   lib/
     ai/                   prompts · openai client · mock generator · analyzer · sanitize
-    auth/                 jwt · session · file-backed user store
+    auth/                 jwt · session · Mongo-backed user store
+    db/                   mongoose connection · User & Generation models · seed
     validation.ts         Zod schemas
     templates.ts          starter templates & prompt examples
     download.ts  history.ts  rate-limit.ts  utils.ts  api.ts
@@ -122,7 +131,7 @@ The AI is instructed to return strict JSON matching the `GenerationResult` type.
 - Generation and prompt-improvement endpoints are **authenticated** and **rate-limited**.
 - Sessions use httpOnly, SameSite cookies.
 
-> The file-based user store (`.data/users.json`) is for zero-config local development. Swap `src/lib/auth/store.ts` for Prisma/Mongoose for production.
+> All persistence is in **MongoDB via Mongoose** (`src/lib/db/`): the `User` model backs auth, and the `Generation` model stores each user's generation history. No application data is written to disk.
 
 ## 🧭 Extending it
 

@@ -25,20 +25,27 @@ export async function POST(req: Request) {
   }
 
   const { email, password } = parsed.data;
-  const found = userStore.findByEmail(email);
-  if (!found || !(await bcrypt.compare(password, found.passwordHash))) {
+  try {
+    const found = await userStore.findByEmail(email);
+    if (!found || !(await bcrypt.compare(password, found.passwordHash))) {
+      return NextResponse.json(
+        { message: "Invalid email or password" },
+        { status: 401 }
+      );
+    }
+
+    const user: AuthUser = {
+      id: found.id,
+      name: found.name,
+      email: found.email,
+      createdAt: found.createdAt,
+    };
+    await createSession(user);
+    return NextResponse.json({ user });
+  } catch (err) {
     return NextResponse.json(
-      { message: "Invalid email or password" },
-      { status: 401 }
+      { message: err instanceof Error ? err.message : "Login failed" },
+      { status: 500 }
     );
   }
-
-  const user: AuthUser = {
-    id: found.id,
-    name: found.name,
-    email: found.email,
-    createdAt: found.createdAt,
-  };
-  await createSession(user);
-  return NextResponse.json({ user });
 }

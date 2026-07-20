@@ -1,10 +1,9 @@
 "use client";
 
-import * as React from "react";
 import Link from "next/link";
 import { FolderKanban, Download, ExternalLink, FileCode2 } from "lucide-react";
 import { toast } from "sonner";
-import { history } from "@/lib/history";
+import { useHistory } from "@/hooks/use-history";
 import { downloadZip } from "@/lib/download";
 import type { HistoryRecord } from "@/types";
 import { timeAgo } from "@/lib/utils";
@@ -13,14 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export default function ProjectsPage() {
-  const [records, setRecords] = React.useState<HistoryRecord[]>([]);
-
-  React.useEffect(() => {
-    const load = () => setRecords(history.all());
-    load();
-    window.addEventListener("aigen:history-changed", load);
-    return () => window.removeEventListener("aigen:history-changed", load);
-  }, []);
+  const { records } = useHistory();
 
   const download = async (r: HistoryRecord) => {
     const slug = r.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");

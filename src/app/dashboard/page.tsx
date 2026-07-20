@@ -12,23 +12,15 @@ import {
   Database,
   Clock,
 } from "lucide-react";
-import { history } from "@/lib/history";
+import { useHistory } from "@/hooks/use-history";
 import { TEMPLATES } from "@/lib/templates";
-import type { HistoryRecord } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { timeAgo } from "@/lib/utils";
 
 export default function DashboardPage() {
-  const [records, setRecords] = React.useState<HistoryRecord[]>([]);
-
-  React.useEffect(() => {
-    const load = () => setRecords(history.all());
-    load();
-    window.addEventListener("aigen:history-changed", load);
-    return () => window.removeEventListener("aigen:history-changed", load);
-  }, []);
+  const { records } = useHistory();
 
   const totalFiles = records.reduce((sum, r) => sum + r.result.files.length, 0);
   const stats = [

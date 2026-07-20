@@ -1,33 +1,24 @@
 "use client";
 
-import * as React from "react";
 import Link from "next/link";
 import { Trash2, Clock, ExternalLink, History as HistoryIcon } from "lucide-react";
 import { toast } from "sonner";
-import { history } from "@/lib/history";
-import type { HistoryRecord } from "@/types";
+import { useHistory } from "@/hooks/use-history";
 import { formatDate } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export default function HistoryPage() {
-  const [records, setRecords] = React.useState<HistoryRecord[]>([]);
+  const { records, remove: removeMut, clear: clearMut } = useHistory();
 
-  React.useEffect(() => {
-    const load = () => setRecords(history.all());
-    load();
-    window.addEventListener("aigen:history-changed", load);
-    return () => window.removeEventListener("aigen:history-changed", load);
-  }, []);
-
-  const remove = (id: string) => {
-    history.remove(id);
+  const remove = async (id: string) => {
+    await removeMut.mutateAsync(id);
     toast.success("Removed from history");
   };
 
-  const clearAll = () => {
-    history.clear();
+  const clearAll = async () => {
+    await clearMut.mutateAsync();
     toast.success("History cleared");
   };
 

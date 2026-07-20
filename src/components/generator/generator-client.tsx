@@ -11,11 +11,10 @@ import {
   Braces,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { GenerationOptions, GenerationResult, HistoryRecord } from "@/types";
+import type { GenerationOptions, GenerationResult } from "@/types";
 import { useGenerate, useImprovePrompt } from "@/hooks/use-generate";
+import { useHistory, fetchHistoryRecord } from "@/hooks/use-history";
 import { loadSettings } from "@/hooks/use-settings";
-import { history } from "@/lib/history";
-import { nanoid } from "@/lib/utils";
 import { TEMPLATES } from "@/lib/templates";
 import { CodeEditor } from "./code-editor";
 import { OptionsPanel } from "./options-panel";
@@ -79,6 +78,7 @@ export function GeneratorClient() {
 
   const generate = useGenerate();
   const improve = useImprovePrompt();
+  const { add: addHistory } = useHistory();
 
   // Apply user defaults + hydrate from ?template= or ?id=.
   React.useEffect(() => {
@@ -100,13 +100,15 @@ export function GeneratorClient() {
         setTitle(tpl.name);
       }
     } else if (historyId) {
-      const record = history.get(historyId);
-      if (record) {
-        setInput(record.input);
-        setOptions(record.result.meta.options);
-        setResult(record.result);
-        setTitle(record.title);
-      }
+      // Reopen a saved generation from MongoDB.
+      fetchHistoryRecord(historyId).then((record) => {
+        if (record) {
+          setInput(record.input);
+          setOptions(record.result.meta.options);
+          setResult(record.result);
+          setTitle(record.title);
+        }
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -131,16 +133,16 @@ export function GeneratorClient() {
       const newTitle = title === "Untitled backend" ? deriveTitle(input) : title;
       setTitle(newTitle);
 
-      const record: HistoryRecord = {
-        id: nanoid(),
-        title: newTitle,
-        createdAt: new Date().toISOString(),
-        database: options.database,
-        framework: options.framework,
-        input,
-        result: res.result,
-      };
-      history.add(record);
+      // Persist to MongoDB (best-effort — generation UX is unaffected on failure).
+      addHistory
+        .mutateAsync({
+          title: newTitle,
+          database: options.database,
+          framework: options.framework,
+          input,
+          result: res.result,
+        })
+        .catch(() => void 0);
       toast.success(`Generated ${res.result.files.length} files`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Generation failed");

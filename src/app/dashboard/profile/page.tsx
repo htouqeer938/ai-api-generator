@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { LogOut, Mail, Calendar, ShieldCheck, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { history } from "@/lib/history";
+import { useHistory } from "@/hooks/use-history";
 import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,9 +20,8 @@ function initials(name: string) {
 export default function ProfilePage() {
   const router = useRouter();
   const { user, isLoading, logout } = useAuth();
-  const [count, setCount] = React.useState(0);
-
-  React.useEffect(() => setCount(history.all().length), []);
+  const { records } = useHistory();
+  const count = records.length;
 
   const onLogout = async () => {
     await logout.mutateAsync();

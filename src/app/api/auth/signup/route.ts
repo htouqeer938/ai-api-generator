@@ -25,21 +25,31 @@ export async function POST(req: Request) {
   }
 
   const { name, email, password } = parsed.data;
-  if (userStore.findByEmail(email)) {
+  try {
+    if (await userStore.findByEmail(email)) {
+      return NextResponse.json(
+        { message: "An account with this email already exists" },
+        { status: 409 }
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const created = await userStore.create({ name, email, passwordHash });
+    const user: AuthUser = {
+      id: created.id,
+      name: created.name,
+      email: created.email,
+      createdAt: created.createdAt,
+    };
+    await createSession(user);
+    return NextResponse.json({ user }, { status: 201 });
+  } catch (err) {
+    // Handle unique-index race on email as a conflict.
+    const message = err instanceof Error ? err.message : "Sign up failed";
+    const status = /duplicate key|E11000/i.test(message) ? 409 : 500;
     return NextResponse.json(
-      { message: "An account with this email already exists" },
-      { status: 409 }
+      { message: status === 409 ? "An account with this email already exists" : message },
+      { status }
     );
   }
-
-  const passwordHash = await bcrypt.hash(password, 10);
-  const created = userStore.create({ name, email, passwordHash });
-  const user: AuthUser = {
-    id: created.id,
-    name: created.name,
-    email: created.email,
-    createdAt: created.createdAt,
-  };
-  await createSession(user);
-  return NextResponse.json({ user }, { status: 201 });
 }
